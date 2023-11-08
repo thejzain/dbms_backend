@@ -1,6 +1,6 @@
 use actix_web::{get, post, web, App, Error, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
-use sqlx::{pool::PoolOptions, sqlite::SqliteConnectOptions, sqlite::SqlitePool};
+use sqlx::{pool::PoolOptions, sqlite::SqlitePool};
 
 #[derive(Clone)]
 struct AppState {
@@ -13,8 +13,9 @@ async fn hello() -> impl Responder {
 }
 
 #[get("/user/{username}")]
-async fn login(path: web::Path<usize>, app_state: web::Data<AppState>) -> impl Responder {
-    let user_id: i64 = path.into_inner() as i64;
+async fn login(path: web::Path<String>, app_state: web::Data<AppState>) -> impl Responder {
+    // let user_id: i64 = path.into_inner() as i64;
+    let user_name = path.to_string();
     #[derive(serde::Serialize, Deserialize)]
     struct User {
         id: i64,
@@ -22,16 +23,18 @@ async fn login(path: web::Path<usize>, app_state: web::Data<AppState>) -> impl R
         password: String,
     }
 
-    let user: Option<User> = sqlx::query_as!(User, "SELECT * FROM User WHERE id = ?", user_id)
-        .fetch_optional(&app_state.pool)
-        .await
-        .unwrap();
+    let user: Option<User> =
+        sqlx::query_as!(User, "SELECT * FROM User WHERE username = ?", user_name)
+            .fetch_optional(&app_state.pool)
+            .await
+            .unwrap();
 
     match user {
         Some(x) => x.username.to_string(),
         None => "not ok".to_string(),
     }
 }
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let address = "127.0.0.1";
