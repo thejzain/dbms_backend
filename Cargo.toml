@@ -6,5 +6,4 @@ edition = "2021"
 [dependencies]
 actix-web = "4.4.0"
 serde = { version = "1.0", features = ["derive"] }
-sqlx = { version = "0.6.2", features = ["runtime-actix-rustls","sqlite", "macros"] }
-tokio = "1.33.0"
+sqlx = "0.7.2"
