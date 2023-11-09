@@ -13,7 +13,7 @@ async fn hello() -> impl Responder {
 }
 
 #[get("/user/{username}")]
-async fn login(path: web::Path<String>, app_state: web::Data<AppState>) -> impl Responder {
+async fn login(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
     // let user_id: i64 = path.into_inner() as i64;
     let user_name = path.to_string();
     #[derive(serde::Serialize, Deserialize)]
@@ -23,6 +23,12 @@ async fn login(path: web::Path<String>, app_state: web::Data<AppState>) -> impl 
         password: String,
     }
 
+    //To fetch all
+    // let user: Vec<User> = sqlx::query_as!(User, "SELECT * FROM User WHERE username = ?", user_name)
+    //     .fetch_all(&app_state.pool)
+    //     .await
+    //     .unwrap();
+
     let user: Option<User> =
         sqlx::query_as!(User, "SELECT * FROM User WHERE username = ?", user_name)
             .fetch_optional(&app_state.pool)
@@ -30,9 +36,10 @@ async fn login(path: web::Path<String>, app_state: web::Data<AppState>) -> impl 
             .unwrap();
 
     match user {
-        Some(x) => x.username.to_string(),
-        None => "not ok".to_string(),
+        Some(x) => HttpResponse::Ok().json(x),
+        None => HttpResponse::BadRequest().into(),
     }
+    // HttpResponse::Ok().json(user)
 }
 
 #[actix_web::main]
