@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, App, Error, HttpResponse, HttpServer, Responder};
+use actix_web::{body::None, get, post, web, App, Error, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolOptions, sqlite::SqlitePool};
 
@@ -12,11 +12,38 @@ struct User {
     id: i64,
     username: String,
     password: String,
+    cover: Option<String>,
+}
+
+#[derive(serde::Serialize, Deserialize)]
+struct Song {
+    id: i64,
+    name: String,
+    release: String,
+    album: String,
+    cover: Option<String>,
+}
+
+#[derive(serde::Serialize, Deserialize)]
+struct Artist {
+    id: i64,
+    name: String,
+    cover: Option<String>,
+    about: String,
 }
 
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello Wordl!")
+}
+
+#[get("/get/songs")]
+async fn get_songs(app_state: web::Data<AppState>) -> HttpResponse {
+    let songs: Vec<Song> = sqlx::query_as!(Song, "SELECT  * FROM Songs")
+        .fetch_all(&app_state.pool)
+        .await
+        .unwrap();
+    HttpResponse::Ok().json(songs)
 }
 
 #[post("/login")]
@@ -30,6 +57,7 @@ async fn login(body: web::Json<User>, app_state: web::Data<AppState>) -> HttpRes
     .fetch_optional(&app_state.pool)
     .await
     .unwrap();
+
     match is_user {
         Some(expr) => HttpResponse::Ok().json(expr),
         None => HttpResponse::NotFound().into(),
@@ -75,6 +103,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(app_state.clone()))
             .service(hello)
             .service(login)
+            .service(get_songs)
     })
     .bind((address, port))?
     .run()
