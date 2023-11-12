@@ -7,21 +7,39 @@ struct AppState {
     pool: SqlitePool,
 }
 
+#[derive(serde::Serialize, Deserialize)]
+struct User {
+    id: i64,
+    username: String,
+    password: String,
+}
+
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello Wordl!")
 }
 
+#[post("/login")]
+async fn login(body: web::Json<User>, app_state: web::Data<AppState>) -> HttpResponse {
+    let is_user: Option<User> = sqlx::query_as!(
+        User,
+        "SELECT * FROM User WHERE username = ? and password = ?",
+        body.username,
+        body.password
+    )
+    .fetch_optional(&app_state.pool)
+    .await
+    .unwrap();
+    match is_user {
+        Some(expr) => HttpResponse::Ok().json(expr),
+        None => HttpResponse::NotFound().into(),
+    }
+}
+
 #[get("/user/{username}")]
-async fn login(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
+async fn username(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
     // let user_id: i64 = path.into_inner() as i64;
     let user_name = path.to_string();
-    #[derive(serde::Serialize, Deserialize)]
-    struct User {
-        id: i64,
-        username: String,
-        password: String,
-    }
 
     //To fetch all
     // let user: Vec<User> = sqlx::query_as!(User, "SELECT * FROM User WHERE username = ?", user_name)
