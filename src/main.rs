@@ -2,6 +2,9 @@ use actix_web::{body::None, get, post, web, App, Error, HttpResponse, HttpServer
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolOptions, sqlite::SqlitePool};
 
+use actix_files as fs;
+use actix_web::http::header::{ContentDisposition, DispositionType};
+
 #[derive(Clone)]
 struct AppState {
     pool: SqlitePool,
@@ -22,6 +25,7 @@ struct Song {
     release: String,
     album: String,
     cover: Option<String>,
+    location: String,
 }
 
 #[derive(serde::Serialize, Deserialize)]
@@ -32,9 +36,23 @@ struct Artist {
     about: String,
 }
 
+#[get("/get/file/{filename:.*}")]
+async fn hostfile(req: web::Path<String>) -> Result<fs::NamedFile, Error> {
+    let path: std::path::PathBuf = format!("/home/zain/dbms_project/assets/{}", req.to_string())
+        .parse()
+        .unwrap();
+    let file = fs::NamedFile::open(path)?;
+    Ok(file
+        .use_last_modified(true)
+        .set_content_disposition(ContentDisposition {
+            disposition: DispositionType::Attachment,
+            parameters: vec![],
+        }))
+}
+
 #[get("/")]
 async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello Wordl!")
+    HttpResponse::Ok().body("Welcome To Munna's Music")
 }
 
 #[get("/get/song")]
@@ -49,12 +67,13 @@ async fn get_songs(app_state: web::Data<AppState>) -> HttpResponse {
 #[post("/post/song")]
 async fn post_songs(body: web::Json<Song>, app_state: web::Data<AppState>) -> HttpResponse {
     let insert_song = sqlx::query!(
-        "INSERT INTO Songs VALUES(?, ?,?,?,?)",
+        "INSERT INTO Songs VALUES(?, ?,?,?,?,?)",
         body.id,
         body.name,
         body.release,
         body.album,
         body.cover,
+        body.location
     )
     .execute(&app_state.pool)
     .await;
@@ -141,6 +160,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_songs)
             .service(post_songs)
             .service(search_song)
+            .service(hostfile)
     })
     .bind((address, port))?
     .run()
