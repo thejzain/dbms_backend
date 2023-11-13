@@ -37,13 +37,48 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello Wordl!")
 }
 
-#[get("/get/songs")]
+#[get("/get/song")]
 async fn get_songs(app_state: web::Data<AppState>) -> HttpResponse {
     let songs: Vec<Song> = sqlx::query_as!(Song, "SELECT  * FROM Songs")
         .fetch_all(&app_state.pool)
         .await
         .unwrap();
     HttpResponse::Ok().json(songs)
+}
+
+#[post("/post/song")]
+async fn post_songs(body: web::Json<Song>, app_state: web::Data<AppState>) -> HttpResponse {
+    let insert_song = sqlx::query!(
+        "INSERT INTO Songs VALUES(?, ?,?,?,?)",
+        body.id,
+        body.name,
+        body.release,
+        body.album,
+        body.cover,
+    )
+    .execute(&app_state.pool)
+    .await;
+    if let Err(_error) = insert_song {
+        HttpResponse::NotAcceptable().into()
+    } else {
+        HttpResponse::Ok().into()
+    }
+}
+
+#[get("/search/{title}")]
+async fn search_song(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
+    let sub_str = path.to_string();
+    let sub_search = format!("%{}%", sub_str);
+    let songs: Vec<Song> =
+        sqlx::query_as!(Song, "SELECT * FROM Songs WHERE name LIKE ?", sub_search)
+            .fetch_all(&app_state.pool)
+            .await
+            .unwrap();
+    if songs.len() == 0 {
+        HttpResponse::NotFound().into()
+    } else {
+        HttpResponse::Ok().json(songs)
+    }
 }
 
 #[post("/login")]
@@ -104,6 +139,8 @@ async fn main() -> std::io::Result<()> {
             .service(hello)
             .service(login)
             .service(get_songs)
+            .service(post_songs)
+            .service(search_song)
     })
     .bind((address, port))?
     .run()
