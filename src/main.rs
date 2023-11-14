@@ -32,7 +32,7 @@ struct Song {
 struct Artist {
     id: i64,
     name: String,
-    cover: Option<String>,
+    cover: String,
     about: String,
 }
 
@@ -89,7 +89,7 @@ async fn search_song(path: web::Path<String>, app_state: web::Data<AppState>) ->
     let sub_str = path.to_string();
     let sub_search = format!("%{}%", sub_str);
     let songs: Vec<Song> =
-        sqlx::query_as!(Song, "SELECT * FROM Songs WHERE name LIKE ?", sub_search)
+    sqlx::query_as!(Song, "SELECT * FROM Songs WHERE name LIKE ?", sub_search)
             .fetch_all(&app_state.pool)
             .await
             .unwrap();
@@ -97,6 +97,22 @@ async fn search_song(path: web::Path<String>, app_state: web::Data<AppState>) ->
         HttpResponse::NotFound().into()
     } else {
         HttpResponse::Ok().json(songs)
+    }
+}
+
+#[get("/search/artist/{title}")]
+async fn search_artist(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
+    let sub_str = path.to_string();
+    let sub_search = format!("%{}%", sub_str);
+    let artists:Vec<Artist>  =
+    sqlx::query_as!(Artist, "SELECT * FROM Artist WHERE name LIKE ?", sub_search)
+            .fetch_all(&app_state.pool)
+            .await
+            .unwrap();
+    if artists.len() == 0 {
+        HttpResponse::NotFound().into()
+    } else {
+        HttpResponse::Ok().json(artists)
     }
 }
 
@@ -161,6 +177,7 @@ async fn main() -> std::io::Result<()> {
             .service(post_songs)
             .service(search_song)
             .service(hostfile)
+            .service(search_artist)
     })
     .bind((address, port))?
     .run()
