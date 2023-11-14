@@ -29,6 +29,17 @@ struct Song {
 }
 
 #[derive(serde::Serialize, Deserialize)]
+struct PostSong {
+    id: i64,
+    name: String,
+    release: String,
+    album: String,
+    cover: Option<String>,
+    location: String,
+    artist: String,
+}
+
+#[derive(serde::Serialize, Deserialize)]
 struct Artist {
     id: i64,
     name: String,
@@ -65,22 +76,31 @@ async fn get_songs(app_state: web::Data<AppState>) -> HttpResponse {
 }
 
 #[post("/post/song")]
-async fn post_songs(body: web::Json<Song>, app_state: web::Data<AppState>) -> HttpResponse {
-    let insert_song = sqlx::query!(
-        "INSERT INTO Songs VALUES(?, ?,?,?,?,?)",
-        body.id,
-        body.name,
-        body.release,
-        body.album,
-        body.cover,
-        body.location
-    )
-    .execute(&app_state.pool)
-    .await;
-    if let Err(_error) = insert_song {
-        HttpResponse::NotAcceptable().into()
+async fn post_songs(body: web::Json<PostSong>, app_state: web::Data<AppState>) -> HttpResponse {
+    let artist: Option<Artist> =
+        sqlx::query_as!(Artist, "SELECT * FROM Artist WHERE name=?", body.artist)
+            .fetch_optional(&app_state.pool)
+            .await
+            .unwrap();
+    if let Some(x) = artist {
+        let insert_song = sqlx::query!(
+            "INSERT INTO Songs VALUES(?, ?,?,?,?,?)",
+            body.id,
+            body.name,
+            body.release,
+            body.album,
+            body.cover,
+            body.location
+        )
+        .execute(&app_state.pool)
+        .await;
+        if let Err(_error) = insert_song {
+            HttpResponse::NotAcceptable().into()
+        } else {
+            HttpResponse::Ok().into()
+        }
     } else {
-        HttpResponse::Ok().into()
+        HttpResponse::NotFound().body("Add artist profile")
     }
 }
 
@@ -89,7 +109,7 @@ async fn search_song(path: web::Path<String>, app_state: web::Data<AppState>) ->
     let sub_str = path.to_string();
     let sub_search = format!("%{}%", sub_str);
     let songs: Vec<Song> =
-    sqlx::query_as!(Song, "SELECT * FROM Songs WHERE name LIKE ?", sub_search)
+        sqlx::query_as!(Song, "SELECT * FROM Songs WHERE name LIKE ?", sub_search)
             .fetch_all(&app_state.pool)
             .await
             .unwrap();
@@ -100,12 +120,30 @@ async fn search_song(path: web::Path<String>, app_state: web::Data<AppState>) ->
     }
 }
 
+#[post("/post/artist")]
+async fn post_artist(body: web::Json<Artist>, app_state: web::Data<AppState>) -> HttpResponse {
+    let insert_artist = sqlx::query!(
+        "INSERT INTO Artist VALUES(?,?,?,?)",
+        body.id,
+        body.name,
+        body.cover,
+        body.about
+    )
+    .execute(&app_state.pool)
+    .await;
+    if let Err(_error) = insert_artist {
+        HttpResponse::NotAcceptable().into()
+    } else {
+        HttpResponse::Ok().into()
+    }
+}
+
 #[get("/search/artist/{title}")]
 async fn search_artist(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
     let sub_str = path.to_string();
     let sub_search = format!("%{}%", sub_str);
-    let artists:Vec<Artist>  =
-    sqlx::query_as!(Artist, "SELECT * FROM Artist WHERE name LIKE ?", sub_search)
+    let artists: Vec<Artist> =
+        sqlx::query_as!(Artist, "SELECT * FROM Artist WHERE name LIKE ?", sub_search)
             .fetch_all(&app_state.pool)
             .await
             .unwrap();
@@ -178,6 +216,7 @@ async fn main() -> std::io::Result<()> {
             .service(search_song)
             .service(hostfile)
             .service(search_artist)
+            .service(post_artist)
     })
     .bind((address, port))?
     .run()
