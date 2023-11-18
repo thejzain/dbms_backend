@@ -49,9 +49,7 @@ struct Artist {
 
 #[get("/get/file/{filename:.*}")]
 async fn hostfile(req: web::Path<String>) -> Result<fs::NamedFile, Error> {
-    let path: std::path::PathBuf = format!("/home/zain/dbms_project/assets/{}", req.to_string())
-        .parse()
-        .unwrap();
+    let path: std::path::PathBuf = format!("./assets/{}", req.to_string()).parse().unwrap();
     let file = fs::NamedFile::open(path)?;
     Ok(file
         .use_last_modified(true)
