@@ -194,6 +194,30 @@ async fn username(path: web::Path<String>, app_state: web::Data<AppState>) -> Ht
     // HttpResponse::Ok().json(user)
 }
 
+#[derive(serde::Serialize, Deserialize)]
+struct Album {
+    id: i64,
+    name: String,
+    artist: String,
+    release: String,
+}
+
+#[get("/search/album/{name}")]
+async fn search_album(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
+    let search = path.to_string();
+    let search_substr = format!("%{}%", search);
+
+    let res: Vec<Album> = sqlx::query_as!(
+        Album,
+        "SELECT * FROM Album WHERE name Like ? ",
+        search_substr
+    )
+    .fetch_all(&app_state.pool)
+    .await
+    .unwrap();
+    HttpResponse::Ok().json(res)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let address = "127.0.0.1";
@@ -215,6 +239,7 @@ async fn main() -> std::io::Result<()> {
             .service(hostfile)
             .service(search_artist)
             .service(post_artist)
+            .service(search_album)
     })
     .bind((address, port))?
     .run()
