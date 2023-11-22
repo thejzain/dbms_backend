@@ -47,6 +47,14 @@ struct Artist {
     about: String,
 }
 
+#[derive(serde::Serialize, Deserialize)]
+struct Album {
+    id: i64,
+    name: String,
+    artist: String,
+    release: String,
+}
+
 #[get("/get/file/{filename:.*}")]
 async fn hostfile(req: web::Path<String>) -> Result<fs::NamedFile, Error> {
     let path: std::path::PathBuf = format!("./assets/{}", req.to_string()).parse().unwrap();
@@ -194,14 +202,6 @@ async fn username(path: web::Path<String>, app_state: web::Data<AppState>) -> Ht
     // HttpResponse::Ok().json(user)
 }
 
-#[derive(serde::Serialize, Deserialize)]
-struct Album {
-    id: i64,
-    name: String,
-    artist: String,
-    release: String,
-}
-
 #[get("/search/album/{name}")]
 async fn search_album(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
     let search = path.to_string();
@@ -215,6 +215,18 @@ async fn search_album(path: web::Path<String>, app_state: web::Data<AppState>) -
     .fetch_all(&app_state.pool)
     .await
     .unwrap();
+    HttpResponse::Ok().json(res)
+}
+
+#[get("/get/album/{name}")]
+async fn get_album(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse {
+    let search = path.to_string();
+
+    let res: Vec<Song> = sqlx::query_as!(Song, "SELECT * FROM Songs WHERE album = ?", search)
+        .fetch_all(&app_state.pool)
+        .await
+        .unwrap();
+
     HttpResponse::Ok().json(res)
 }
 
@@ -240,6 +252,7 @@ async fn main() -> std::io::Result<()> {
             .service(search_artist)
             .service(post_artist)
             .service(search_album)
+            .service(get_album)
     })
     .bind((address, port))?
     .run()
